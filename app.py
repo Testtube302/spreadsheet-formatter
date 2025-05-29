@@ -1,6 +1,22 @@
 import streamlit as st
 import pandas as pd
 import io
+from string import ascii_uppercase
+
+# Helper to generate Excel-style column labels (e.g., AK to AP)
+def get_column_range(start, end):
+    cols = []
+    found = False
+    for c1 in ascii_uppercase:
+        for c2 in ascii_uppercase:
+            col = c1 + c2
+            if col == start:
+                found = True
+            if found:
+                cols.append(col)
+            if col == end:
+                return cols
+    return cols
 
 def process_dataframe(df):
     df.columns = df.columns.str.strip()
@@ -8,25 +24,27 @@ def process_dataframe(df):
     # Remove rows A to E (first 5 rows)
     df = df.iloc[5:].reset_index(drop=True)
 
-    col_map = {
+    # Set specific values if cell is not empty
+    replacements = {
         'O': 'United States',
         'P': 'Home',
         'Y': 'Home',
         'AH': 'United States',
-        'AI': 'Florida',
+        'AI': 'Florida'
     }
 
-    for col, val in col_map.items():
+    for col, val in replacements.items():
         if col in df.columns:
             df[col] = df[col].where(df[col].isna(), val)
 
-    # Boolean transformation
+    # Boolean transformation: S, T, U and AK–AP
     bool_map = {'yes': True, 'y': True, 'no': False, 'n': False}
-    for col in ['S', 'T', 'U'] + [chr(i) for i in range(ord('AK'), ord('AQ')+1)]:
+    boolean_columns = ['S', 'T', 'U'] + get_column_range('AK', 'AP')
+    for col in boolean_columns:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.lower().map(bool_map).fillna(df[col])
 
-    # Clear content for specific columns
+    # Clear specific columns
     for col in ['AB', 'AD', 'AE', 'AQ', 'AR']:
         if col in df.columns:
             df[col] = ""
@@ -35,19 +53,22 @@ def process_dataframe(df):
 
 def process_excel(file):
     xl = pd.ExcelFile(file)
-    output = pd.ExcelWriter('output.xlsx', engine='xlsxwriter')
+    output_buffer = io.BytesIO()
+    writer = pd.ExcelWriter(output_buffer, engine='xlsxwriter')
 
     for sheet in xl.sheet_names:
         df = xl.parse(sheet)
         df = process_dataframe(df)
-        df.to_excel(output, sheet_name=sheet, index=False)
+        df.to_excel(writer, sheet_name=sheet, index=False)
 
-    output.save()
-    return 'output.xlsx'
+    writer.close()
+    output_buffer.seek(0)
+    return output_buffer
 
-st.title("Excel/CSV Data Formatter")
+# Streamlit UI
+st.title("🧾 Spreadsheet Formatter")
 
-uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
+uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "csv"])
 
 if uploaded_file:
     if uploaded_file.name.endswith(".csv"):
@@ -58,8 +79,8 @@ if uploaded_file:
         df.to_excel(output, index=False)
         output.seek(0)
 
-        st.download_button("Download Processed File", output, file_name="formatted_output.xlsx")
+        st.download_button("📥 Download Formatted File", output, file_name="formatted_output.xlsx")
+
     else:
-        output_path = process_excel(uploaded_file)
-        with open(output_path, "rb") as f:
-            st.download_button("Download Processed File", f, file_name="formatted_output.xlsx")
+        output = process_excel(uploaded_file)
+        st.download_button("📥 Download Formatted File", output, file_name="formatted_output.xlsx")
