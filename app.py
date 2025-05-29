@@ -33,6 +33,23 @@ def process_columns(df):
                 if pd.notna(cell_value) and str(cell_value).strip() != "":
                     df.iat[i, col_index] = ""
 
+        # Column AH = 33 → If user data exists, set to "United States"
+        if df.shape[1] > 33 and pd.notna(df.iat[i, 33]) and str(df.iat[i, 33]).strip() != "":
+            df.iat[i, 33] = "United States"
+
+        # Column AI = 34 → Always set to "Florida"
+        if df.shape[1] > 34:
+            df.iat[i, 34] = "Florida"
+
+        # Columns AK–AP = 36–41
+        for col_index in range(36, 42):
+            if df.shape[1] > col_index:
+                val = str(df.iat[i, col_index]).strip().lower() if pd.notna(df.iat[i, col_index]) else ""
+                if val in ["yes", "y"]:
+                    df.iat[i, col_index] = "true"
+                elif val in ["no", "n"]:
+                    df.iat[i, col_index] = "false"
+
     return df
 
 # Process all sheets in the Excel file
@@ -57,7 +74,7 @@ uploaded_file = st.file_uploader("Upload an Excel (.xlsx) file", type=["xlsx"])
 
 if uploaded_file:
     processed_file = process_excel_file(uploaded_file)
-    st.success("✅ File processed: Columns O, P, S, T, U, Y, AB, AD, AE updated.")
+    st.success("✅ File processed successfully.")
     st.download_button(
         label="📥 Download Processed File",
         data=processed_file,
