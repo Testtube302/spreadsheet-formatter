@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import io
 
-# Apply all transformation rules for columns O, P, S, T, U, Y
-def process_columns_OPSTUY(df):
-    for i in range(1, len(df)):  # Skip header row
+# Function to apply formatting rules to a DataFrame
+def process_columns(df):
+    for i in range(1, len(df)):  # Skip header row (row 0)
         # Column O = 14
         if df.shape[1] > 14 and pd.notna(df.iat[i, 14]) and str(df.iat[i, 14]).strip() != "":
             df.iat[i, 14] = "United States"
@@ -26,17 +26,24 @@ def process_columns_OPSTUY(df):
         if df.shape[1] > 24 and pd.notna(df.iat[i, 24]) and str(df.iat[i, 24]).strip() != "":
             df.iat[i, 24] = "Home"
 
+        # Columns AB, AD, AE = 27, 29, 30 → Clear if data exists
+        for col_index in [27, 29, 30]:
+            if df.shape[1] > col_index:
+                cell_value = df.iat[i, col_index]
+                if pd.notna(cell_value) and str(cell_value).strip() != "":
+                    df.iat[i, col_index] = ""
+
     return df
 
-# Process each sheet in the Excel file
+# Process all sheets in the Excel file
 def process_excel_file(file):
     xl = pd.ExcelFile(file)
     output = io.BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
 
     for sheet_name in xl.sheet_names:
-        df = xl.parse(sheet_name, header=None)  # Treat first row as raw data
-        df = process_columns_OPSTUY(df)
+        df = xl.parse(sheet_name, header=None)  # No header assumed
+        df = process_columns(df)
         df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
 
     writer.close()
@@ -44,13 +51,13 @@ def process_excel_file(file):
     return output
 
 # Streamlit UI
-st.title("📄 Excel Formatter: Columns O, P, S, T, U, Y")
+st.title("📊 Excel Multi-Sheet Formatter")
 
 uploaded_file = st.file_uploader("Upload an Excel (.xlsx) file", type=["xlsx"])
 
 if uploaded_file:
     processed_file = process_excel_file(uploaded_file)
-    st.success("✅ Columns O, P, S, T, U, and Y processed successfully across all sheets.")
+    st.success("✅ File processed: Columns O, P, S, T, U, Y, AB, AD, AE updated.")
     st.download_button(
         label="📥 Download Processed File",
         data=processed_file,
